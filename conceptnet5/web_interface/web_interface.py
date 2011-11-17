@@ -14,6 +14,8 @@ from flask import request
 from flask import send_from_directory
 from flask import url_for
 from conceptnet5.graph import get_graph
+from conceptnet5.votes import get_vote_collection
+from conceptnet5.votes import record_vote
 from conceptnet5.web_interface.utils import data_url
 from conceptnet5.web_interface.utils import uri2name
 
@@ -76,13 +78,13 @@ def get_assertion(uri):
         if not vote:
             return 'You didn\'t vote.'
         # Record.
+        vote_collection = get_vote_collection()
+        ip_address = request.remote_addr
         if vote == 'agree':
-            ip_address = request.remote_addr
-            # TODO(jven): store vote
+            record_vote(vote_collection, assertion_uri, vote, ip_address)
             return 'Successfully voted: agree'
         elif vote == 'disagree':
-            ip_address = request.remote_addr
-            # TODO(jven): store vote
+            record_vote(vote_collection, assertion_uri, vote, ip_address)
             return 'Successfully voted: disagree.'
         else:
             return 'Invalid vote.'
