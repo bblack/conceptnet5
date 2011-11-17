@@ -10,7 +10,7 @@ $(document).ready(function() {
       $.post(button.attr('data-assertion_url'), {
           'vote':button.attr('data-vote')
       }, function(response) {
-          alert('ok!');
+          alert(response);
       });
     });
   });

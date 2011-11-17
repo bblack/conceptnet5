@@ -77,15 +77,20 @@ def get_assertion(uri):
         # Validate.
         if not vote:
             return 'You didn\'t vote.'
-        # Record.
+        # Make sure user hasn't voted for this assertion before.
         vote_collection = get_vote_collection()
         ip_address = request.remote_addr
+        vote_doc = vote_collection.find_one(
+            {'assertion_uri':assertion_uri, 'ip_address':ip_address})
+        if vote_doc:
+            return 'You\'ve already voted for this assertion.'
+        # Record.
         if vote == 'agree':
             record_vote(vote_collection, assertion_uri, vote, ip_address)
-            return 'Successfully voted: agree'
+            return 'Agreed!'
         elif vote == 'disagree':
             record_vote(vote_collection, assertion_uri, vote, ip_address)
-            return 'Successfully voted: disagree.'
+            return 'Disagreed!'
         else:
             return 'Invalid vote.'
 
