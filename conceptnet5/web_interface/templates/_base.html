@@ -7,7 +7,9 @@
 <title>ConceptNet 5</title>
 {% endblock %}
 <script src="{{url_for('static', filename='js/coffee-script.js')}}" type="text/javascript"></script>
-
+<script src="{{url_for('static', filename='js/jquery-1.7.min.js')}}" type="text/javascript"></script>
+{% block scripts %}
+{% endblock %}
 </head>
 <body>
 <div class="column">
@@ -16,8 +18,5 @@
 {% endblock %}
 </div>
 </div>
-
-{% block scripts %}
-{% endblock %}
 </body>
 </html>

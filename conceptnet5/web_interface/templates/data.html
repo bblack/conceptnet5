@@ -2,6 +2,35 @@
 {% block title %}
 <title>ConceptNet 5: {{ node.name }}</title>
 {% endblock %}
+{% block scripts %}
+<script type="text/javascript" src="{{url_for('static', filename='js/data.js')}}"></script>
+<script type="text/javascript" src="{{url_for('static', filename='js/jquery.isotope.min.js')}}"></script>
+<script type="text/coffeescript">
+$ ->
+    $container = $('#assertionContainer')
+    $container.find('.concept-box').each ->
+        $this = $(this)
+        textlength = $this.attr('data-name').length
+        boxwidth = textlength * 18
+        if boxwidth > 1000
+            boxwidth = 1000
+        if boxwidth < 150
+            boxwidth = 150
+        $this.width(boxwidth)
+
+
+    $container.isotope({
+        layoutMode: 'fitRows'
+        masonry: {columnWidth: 120},
+        getSortData: {
+            score: ($elem) -> $elem.attr('data-score')
+            relation: ($elem) -> $elem.attr('data-relation')
+        }
+    })
+    window.container = $container
+
+</script>
+{% endblock %}
 {% block content %}
 <h1>{{ node.name }}</h1>
 <hr />
@@ -91,16 +120,14 @@
         <table>
         <tr>
         <td>
-        <form action="{{ assertion.assertion_uri|e }}" method=POST>
-        <input type="hidden" name="vote" value="agree" />
-        <input type="submit" value="Agree" />
-        </form>
+        <button class="vote_button"
+            data-assertion_url="{{ assertion['assertion_uri']|e }}"
+            data-vote="agree">Agree</button>
         </td>
         <td>
-        <form action="{{ assertion.assertion_uri|e }}" method=POST>
-        <input type="hidden" name="vote" value="disagree" />
-        <input type="submit" value="Disagree" />
-        </form>
+        <button class="vote_button"
+            data-assertion_url="{{ assertion['assertion_uri']|e }}"
+            data-vote="disagree">Disagree</button>
         </td>
         </tr>
         </table>
@@ -123,34 +150,4 @@
 <a href="/data{{ node.uri }}">JSON format</a> -
 <a href="http://conceptnet5.media.mit.edu">About ConceptNet 5</a>
 </p>
-{% endblock %}
-
-{% block scripts %}
-<script type="text/javascript" src="{{url_for('static', filename='js/jquery-1.6.2.min.js')}}"></script>
-<script type="text/javascript" src="{{url_for('static', filename='js/jquery.isotope.min.js')}}"></script>
-<script type="text/coffeescript">
-$ ->
-    $container = $('#assertionContainer')
-    $container.find('.concept-box').each ->
-        $this = $(this)
-        textlength = $this.attr('data-name').length
-        boxwidth = textlength * 18
-        if boxwidth > 1000
-            boxwidth = 1000
-        if boxwidth < 150
-            boxwidth = 150
-        $this.width(boxwidth)
-
-
-    $container.isotope({
-        layoutMode: 'fitRows'
-        masonry: {columnWidth: 120},
-        getSortData: {
-            score: ($elem) -> $elem.attr('data-score')
-            relation: ($elem) -> $elem.attr('data-relation')
-        }
-    })
-    window.container = $container
-
-</script>
 {% endblock %}
