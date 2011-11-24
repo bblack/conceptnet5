@@ -14,8 +14,7 @@ from flask import request
 from flask import send_from_directory
 from flask import url_for
 from conceptnet5.graph import get_graph
-from conceptnet5.votes import get_vote_collection
-from conceptnet5.votes import record_vote
+from conceptnet5.votes import VoteDatabase
 from conceptnet5.web_interface.utils import data_url
 from conceptnet5.web_interface.utils import uri2name
 
@@ -28,6 +27,7 @@ DEVELOPMENT = True
 
 app = Flask(__name__)
 conceptnet = get_graph()
+vote_db = VoteDatabase()
 
 if DEVELOPMENT:
   web_route = '/web/'
@@ -78,18 +78,15 @@ def get_assertion(uri):
         if not vote:
             return 'You didn\'t vote.'
         # Make sure user hasn't voted for this assertion before.
-        vote_collection = get_vote_collection()
         ip_address = request.remote_addr
-        vote_doc = vote_collection.find_one(
-            {'assertion_uri':assertion_uri, 'ip_address':ip_address})
-        if vote_doc:
+        if vote_db.vote_exists(assertion_uri, ip_address):
             return 'You\'ve already voted for this assertion.'
         # Record.
         if vote == 'agree':
-            record_vote(vote_collection, assertion_uri, vote, ip_address)
+            vote_db.record_vote(assertion_uri, vote, ip_address)
             return 'Agreed!'
         elif vote == 'disagree':
-            record_vote(vote_collection, assertion_uri, vote, ip_address)
+            vote_db.record_vote(assertion_uri, vote, ip_address)
             return 'Disagreed!'
         else:
             return 'Invalid vote.'
