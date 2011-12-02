@@ -68,7 +68,7 @@ def reduce_activation(key, values):
 def setup():
     # install the appropriate version of ConceptNet on all machines
     execute('install_reductio')
-    execute('install_git_package', 'commonsense', 'conceptnet', 'reductio')
+    execute('install_git_package', 'commonsense', 'conceptnet5', 'reductio')
 
     # clear out previous data
     execute('delete', 'corona')
