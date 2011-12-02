@@ -67,6 +67,7 @@ def reduce_activation(key, values):
 @task
 def setup():
     # install the appropriate version of ConceptNet on all machines
+    execute('install_reductio')
     execute('install_git_package', 'commonsense', 'conceptnet', 'reductio')
 
     # clear out previous data
