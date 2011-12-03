@@ -1,10 +1,10 @@
 from fabric.api import execute, task, run, cd, sudo, roles, serial
-from reductio.tasks import scatter, sort, map, reduce
+from reductio.tasks import scatter, sort, map, reduce, install_git_package
 
 def reduce_counts(key, values):
     total = 0
     for value_str in values:
-        count = value_str.split('\t')[1]
+        count = int(value_str.split('\t')[1])
         total += count
     yield key, total
 
@@ -23,4 +23,5 @@ def unzip_files():
 
 @task
 def count_bigrams():
+    execute('install_git_package', 'commonsense', 'conceptnet5', 'reductio')
     execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts', 'gb-bigrams/step0', 'gb-bigrams/counts1')
