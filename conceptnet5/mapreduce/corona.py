@@ -1,5 +1,5 @@
 # This relies on reductio (github.com/rspeer/reductio) and Fabric.
-from reductio.tasks import initialize, initial_scatter, scatter, sort, map, reduce, deploy_worker_config, install_reductio, install_git_package
+from reductio.tasks import initialize, initial_scatter, scatter, delete, sort, map, reduce, deploy_worker_config, install_reductio, install_git_package
 from fabric.api import execute, task
 import itertools
 import json
@@ -21,17 +21,6 @@ def load_edges(output):
         value = u"edge\t{type}\t{end}\t{score}".format(type=type,
           end=end, score=score)
         output.write_pair(start, value)
-
-def load_nodes(output):
-    for line in open('inputs/nodes.json'):
-        obj = json.loads(line)
-        uri = obj['uri']
-        if uri == '/':
-            score = 1
-        else:
-            score = 0
-        value = u"NODE\t{0}".format(score)
-        output.write_pair(uri, value)
 
 def map_activation(key, value):
     parts = value.split('\t')
@@ -112,9 +101,6 @@ def reduce_activation(key, values):
 
 @task
 def clean():
-    # safety net
-    raise
-
     # clear out previous data
     execute('delete', 'corona')
 
@@ -126,28 +112,30 @@ def setup():
 
 @task
 def forward_init():
-    initialize('conceptnet5.mapreduce.corona.load_nodes', 'corona/init',
-               'corona/weights_0')
+    sys.stderr.write("init edges\n")
     initialize('conceptnet5.mapreduce.corona.load_edges', 'corona/init',
                'corona/weights_0')
-    #initial_scatter('corona/init', 'corona/weights_0')
 
 @task
 def forward():
     sys.stderr.write("sort\n")
-    execute('sort', 'corona/weights_0', 'corona/weights_2')
-    execute('map', 'conceptnet5.mapreduce.corona.map_activation', 'corona/weights_2', 'corona/map_1')
+    execute('sort', 'corona/weights_0', 'corona/weights_1')
+    sys.stderr.write("map\n")
+    execute('map', 'conceptnet5.mapreduce.corona.map_activation', 'corona/weights_1', 'corona/map_1')
+    sys.stderr.write("sort-map\n")
     execute('sort', 'corona/map_1', 'corona/map_2')
     execute('scatter', 'corona/map_2', 'corona/map_3')
     execute('delete', 'corona/weights_2')
     execute('delete', 'corona/map_1')
     execute('delete', 'corona/map_2')
+    sys.stderr.write("reduce\n")
     execute('reduce', 'conceptnet5.mapreduce.corona.reduce_nodes', 'corona/map_3', 'corona/reduce_1')
+    sys.stderr.write("sort-reduce\n")
     execute('sort', 'corona/reduce_1', 'corona/reduce_2')
     execute('scatter', 'corona/reduce_2', 'corona/reduce_3')
-    execute('delete', 'corona/map_3')
-    execute('delete', 'corona/reduce_1')
-    execute('delete', 'corona/reduce_2')
+    #execute('delete', 'corona/map_3')
+    #execute('delete', 'corona/reduce_1')
+    #execute('delete', 'corona/reduce_2')
 
 @task
 def forward_step2():
