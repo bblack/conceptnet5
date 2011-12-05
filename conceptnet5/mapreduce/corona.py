@@ -1,9 +1,13 @@
 # This relies on reductio (github.com/rspeer/reductio) and Fabric.
-from reductio.tasks import initialize, initial_scatter, scatter, delete, sort, map, reduce, deploy_worker_config, install_reductio, install_git_package
-from fabric.api import execute, task
+from reductio.tasks import initialize, initial_scatter, scatter, delete, sort, map, reduce, deploy_worker_config, install_reductio, install_git_package, deploy_worker_config, configure_ubuntu
+from fabric.api import execute, task, sudo, roles
 import itertools
 import json
 import sys
+import os
+from reductio import config
+
+config.HOMEDIR = os.path.expanduser('~/.reductio/master')
 
 def load_edges(output):
     for line in open('inputs/edges.json'):
@@ -23,30 +27,36 @@ def load_edges(output):
         output.write_pair(start, value)
 
 def map_activation(key, value):
-    parts = value.split('\t')
-    if parts[0] == 'NODE' and key == '/':
-        yield '/', u'NODE\t1'
-    elif parts[0] == 'edge':
-        yield key, value
-        endURI = parts[2]
-        score = float(parts[3])
-        node_value = u"NODE\t{0}".format(score)
-        yield endURI, node_value
+    try:
+        parts = value.split('\t')
+        if parts[0] == 'NODE' and key == '/':
+            yield '/', u'NODE\t1'
+        elif parts[0] == 'edge':
+            yield key, value
+            endURI = parts[2]
+            score = float(parts[3])
+            node_value = u"NODE\t{0}".format(score)
+            yield endURI, node_value
+    except ValueError:
+        print "ValueError for (%r, %r)" % (key, value)
 
 def reduce_nodes(key, values):
-    conjunction = key.startswith('/conjunction')
-    sum = 0.
-    for value in values:
-        parts = value.split('\t')
-        val2 = float(parts[-1])
-        if conjunction:
-            if val2 == 0:
-                val2 = 0.000000001
-            sum += 1./val2
-        else:
-            sum += val2
-        if parts[0] == 'edge':
-            yield key, value
+    try:
+        conjunction = key.startswith('/conjunction')
+        sum = 0.
+        for value in values:
+            parts = value.split('\t')
+            val2 = float(parts[-1])
+            if conjunction:
+                if val2 == 0:
+                    val2 = 0.000000001
+                sum += 1./val2
+            else:
+                sum += val2
+            if parts[0] == 'edge':
+                yield key, value
+    except ValueError:
+        print "ValueError for (%r, %r)" % (key, value)
     
     if conjunction:
         sum = 1./sum
@@ -107,7 +117,9 @@ def clean():
 @task
 def setup():
     # install the appropriate version of ConceptNet on all machines
+    execute('configure_ubuntu')
     execute('install_reductio')
+    execute('deploy_worker_config')
     execute('install_git_package', 'commonsense', 'conceptnet5', 'reductio')
 
 @task
@@ -115,12 +127,14 @@ def forward_init():
     sys.stderr.write("init edges\n")
     initialize('conceptnet5.mapreduce.corona.load_edges', 'corona/init',
                'corona/weights_0')
+    #initial_scatter('corona/init', 'corona/weights_0')
 
 @task
 def forward():
-    sys.stderr.write("sort\n")
-    execute('sort', 'corona/weights_0', 'corona/weights_1')
+    #sys.stderr.write("sort\n")
+    #execute('sort', 'corona/weights_0', 'corona/weights_1')
     sys.stderr.write("map\n")
+    execute('delete', 'corona/map_1')
     execute('map', 'conceptnet5.mapreduce.corona.map_activation', 'corona/weights_1', 'corona/map_1')
     sys.stderr.write("sort-map\n")
     execute('sort', 'corona/map_1', 'corona/map_2')
