@@ -5,6 +5,16 @@ import os
 
 config.HOMEDIR = os.path.expanduser('~/.reductio/master')
 
+def reduce_counts_ngram(key, values):
+    total = 0
+    for value_str in values:
+        count = int(value_str.split('\t')[1])
+        total += count
+    if ' ' in key:
+        for word in key.split(' '):
+            yield word, total
+    yield key, total
+
 def reduce_counts(key, values):
     total = 0
     for value_str in values:
@@ -33,4 +43,7 @@ def setup():
 
 @task
 def count_bigrams():
-    execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts', 'gb-bigrams/step0', 'gb-bigrams/counts1')
+    execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts_ngram', 'gb-bigrams/step0', 'gb-bigrams/counts1')
+    execute('scatter', 'gb-bigrams/counts1', 'gb-bigrams/counts2')
+    execute('sort', 'gb-bigrams/counts2', 'gb-bigrams/counts3')
+    execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts_ngram', 'gb-bigrams/counts3', 'gb-bigrams/counts4')
