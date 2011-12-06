@@ -133,9 +133,9 @@ def forward_init():
 def forward():
     #sys.stderr.write("sort\n")
     #execute('sort', 'corona/weights_0', 'corona/weights_1')
-    sys.stderr.write("map\n")
-    execute('delete', 'corona/map_1')
-    execute('map', 'conceptnet5.mapreduce.corona.map_activation', 'corona/weights_1', 'corona/map_1')
+    #sys.stderr.write("map\n")
+    #execute('delete', 'corona/map_1')
+    #execute('map', 'conceptnet5.mapreduce.corona.map_activation', 'corona/weights_1', 'corona/map_1')
     sys.stderr.write("sort-map\n")
     execute('sort', 'corona/map_1', 'corona/map_2')
     execute('scatter', 'corona/map_2', 'corona/map_3')
