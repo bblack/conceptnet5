@@ -1,5 +1,5 @@
 from fabric.api import execute, task, run, cd, sudo, roles, serial, env, settings
-from reductio.tasks import scatter, sort, map, reduce, install_git_package, delete, install_reductio
+from reductio.tasks import scatter, sort, map, reduce, install_git_package, delete, install_reductio, configure_ubuntu
 from reductio import config
 import os
 
@@ -30,7 +30,7 @@ def reduce_counts(key, values):
 def prereqs():
     run('mkdir -p ~/.reductio/gb-bigrams/step0')
     with settings(warn_only=True):
-        sudo('aptitude install unzip')
+        sudo('aptitude install -y unzip')
 
 @task
 @roles('workers')
