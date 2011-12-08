@@ -5,7 +5,7 @@ import os
 from mrjob.job import MRJob
 
 class CORONAForwardStep(MRJob):
-    def map_activation(key, value):
+    def map_activation(self, key, value):
         try:
             parts = value.split('\t')
             if parts[0] == 'NODE' and key == '/':
@@ -19,7 +19,7 @@ class CORONAForwardStep(MRJob):
         except ValueError:
             print "ValueError for (%r, %r)" % (key, value)
 
-    def reduce_activation(key, values):
+    def reduce_activation(self, key, values):
         conjunction = key.startswith('/conjunction')
         sum = 0.
         node_score = 0.
