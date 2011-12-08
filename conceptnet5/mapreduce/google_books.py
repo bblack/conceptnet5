@@ -1,52 +1,22 @@
-from fabric.api import execute, task, run, cd, sudo, roles, serial, env, settings
-from reductio.tasks import scatter, sort, map, reduce, install_git_package, delete, install_reductio, configure_ubuntu
-from reductio import config
+from mrjob.job import MRJob
 import os
 
-config.HOMEDIR = os.path.expanduser('~/.reductio/master')
-
-def reduce_counts_ngram(key, values):
-    total = 0
-    for value_str in values:
-        count = int(value_str.split('\t')[1])
-        year = int(value_str.split('\t')[0])
+class GoogleNgramReducer(MRJob):
+    def mapper(self, key, line):
+        print line
+        try:
+            rowid, ngram, year, occurrences, pages, books = line.split('\t')
+        except ValueError:
+            raise ValueError(line[:200])
         if year >= 1960:
-            total += count
-    if ' ' in key:
-        for word in key.split(' '):
-            yield word, total
-    yield key, total
+            text = ngram.decode('utf-8').lower()
+            yield text.encode('utf-8'), int(occurrences)
 
-def reduce_counts(key, values):
-    total = 0
-    for value_str in values:
-        count = int(value_str)
-        total += count
-    yield key, total
+    def reducer(self, key, values):
+        yield key, sum(values)
 
-@task
-@roles('workers')
-@serial
-def prereqs():
-    run('mkdir -p ~/.reductio/gb-bigrams/step0')
-    with settings(warn_only=True):
-        sudo('aptitude install -y unzip')
+    def hadoop_input_format(self):
+        return 'SequenceFileAsTextInputFormat'
 
-@task
-@roles('workers')
-def unzip_files():
-    with cd('~/.reductio/google-books'):  # make more general
-        run('for i in *.zip; do unzip -o $i; mv ${i%.zip} ~/.reductio/gb-bigrams/step0/; done')
-
-@task
-def setup():
-    execute('install_reductio')
-    execute('install_git_package', 'commonsense', 'conceptnet5', 'reductio')
-    execute('delete', 'gb-bigrams/counts1')
-
-@task
-def count_bigrams():
-    execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts_ngram', 'gb-bigrams/step0', 'gb-bigrams/counts1')
-    execute('scatter', 'gb-bigrams/counts1', 'gb-bigrams/counts2')
-    execute('sort', 'gb-bigrams/counts2', 'gb-bigrams/counts3')
-    execute('reduce', 'conceptnet5.mapreduce.google_books.reduce_counts', 'gb-bigrams/counts3', 'gb-bigrams/counts4')
+if __name__ == '__main__':
+    GoogleNgramReducer.run()
