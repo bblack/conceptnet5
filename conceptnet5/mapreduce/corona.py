@@ -6,16 +6,23 @@ from mrjob.job import MRJob
 
 class CORONAForwardStep(MRJob):
     def map_activation(self, key, value):
+        if key is None:
+            key, value = value.split('\t', 1)
         try:
             parts = value.split('\t')
-            if parts[0] == 'NODE' and key == '/':
-                yield '/', u'NODE\t1'
+            if parts[0] == 'NODE':
+                yield key, value
             elif parts[0] == 'edge':
                 yield key, value
                 endURI = parts[2]
                 score = float(parts[3])
-                node_value = u"NODE\t{0}".format(score)
-                yield endURI, node_value
+                if key == '/':
+                    score = 1.0
+                if score > 0:
+                    node_value = u"NODE\t{0}".format(score)
+                    yield endURI, node_value
+            else:
+                raise ValueError("Unknown thing: (%r, %r)" % (key, value))
         except ValueError:
             print "ValueError for (%r, %r)" % (key, value)
 
