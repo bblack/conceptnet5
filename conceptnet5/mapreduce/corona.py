@@ -1,5 +1,3 @@
-import itertools
-import json
 import sys
 import os
 from mrjob.job import MRJob
@@ -19,7 +17,7 @@ class CORONAForwardStep(MRJob):
                 if key == '/':
                     score = 1.0
                 if score > 0:
-                    node_value = u"NODE\t{0}".format(score)
+                    node_value = u"NODE\t%s" % score
                     yield endURI, node_value
             else:
                 raise ValueError("Unknown thing: (%r, %r)" % (key, value))
@@ -47,7 +45,7 @@ class CORONAForwardStep(MRJob):
             if parts[0] == 'edge':
                 type = parts[1]
                 end = parts[2]
-                edge_value = u"edge\t{type}\t{end}\t{node_score}".format(
+                edge_value = u"edge\t%(type)s\t%(end)s\t%(node_score)s" % dict(
                   type=type, end=end, node_score=node_score
                 )
                 yield key, edge_value
@@ -56,11 +54,13 @@ class CORONAForwardStep(MRJob):
             sum = 1./sum
             if sum < 1e-8:
                 sum = 0
-        node_value = u"NODE\t{0}".format(sum)
+        node_value = u"NODE\t%s" % sum
         yield key, node_value
 
     def steps(self):
-        return [self.mr(self.map_activation, self.reduce_activation)] * 3
+        return [self.mr(self.map_activation, self.reduce_activation),
+                self.mr(self.map_activation, self.reduce_activation),
+                self.mr(self.map_activation, self.reduce_activation)]
 
 if __name__ == '__main__':
     CORONAForwardStep.run()
