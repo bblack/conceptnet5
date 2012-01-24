@@ -1017,7 +1017,7 @@ class JSONWriterGraph(ConceptNetGraph):
         self.nodes.close()
         self.edges.close()
 
-def get_graph(server='67.202.5.17'):
+def get_graph(server='europa.csc.media.mit.edu'):
     """
     Return a graph object representing the Concept Net graph hosted
     on the Amazon server for the Concept Net team.
