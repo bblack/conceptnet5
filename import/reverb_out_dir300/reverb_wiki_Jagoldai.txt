@@ -1,0 +1,1 @@
+/Users/nidhikulkarni/Desktop/knowitall-reverb-core-3138a80/scripts/../../wikipedia/dir300/wiki_Jagoldai.txt	13847	It	was founded in	1438	0	1	1	4	4	5	0.5020118440151656	It was founded in 1438 by Tatars of Golden Horde .	PRP VBD VBN IN CD IN NNPS IN NNP NNP .	B-NP B-VP I-VP B-PP B-NP B-PP B-NP I-NP I-NP I-NP O	it	found in	#

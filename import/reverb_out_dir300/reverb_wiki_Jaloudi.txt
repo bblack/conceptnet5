@@ -1,0 +1,1 @@
+/Users/nidhikulkarni/Desktop/knowitall-reverb-core-3138a80/scripts/../../wikipedia/dir300/wiki_Jaloudi.txt	23422	Jaludi	is	a Bedouin tribe/clan	0	1	1	2	2	5	0.9329060080619888	Jaludi is a Bedouin tribe/clan from the Arabian Peninsula .	NNP VBZ DT NNP NN IN DT JJ NNP .	B-NP B-VP B-NP I-NP I-NP B-PP B-NP I-NP I-NP O	jaludi	be	a bedouin tribe/clan

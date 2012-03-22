@@ -1,0 +1,1 @@
+/Users/nidhikulkarni/Desktop/knowitall-reverb-core-3138a80/scripts/../../wikipedia/dir300/wiki_Jacques Genest.txt	5357	He	is a professor at	McGill University	0	1	1	5	5	7	0.9999999998786191	He is a professor at McGill University .	PRP VBZ DT NN IN NNP NNP .	B-NP B-VP B-NP I-NP B-PP B-NP I-NP O	he	be professor at	mcgill university

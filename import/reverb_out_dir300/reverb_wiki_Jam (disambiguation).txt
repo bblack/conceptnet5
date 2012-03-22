@@ -1,0 +1,1 @@
+/Users/nidhikulkarni/Desktop/knowitall-reverb-core-3138a80/scripts/../../wikipedia/dir300/wiki_Jam (disambiguation).txt	23583	Jam	is a type of	fruit preserves	0	1	1	5	5	7	0.9999999998833959	Jam is a type of fruit preserves .	NNP VBZ DT NN IN NN NNS .	B-NP B-VP B-NP I-NP I-NP I-NP I-NP O	jam	be type of	fruit preserves
