@@ -25,8 +25,10 @@ GRAPH.justify('/', wikipedia)
 TYPE_WORDS = ('type', 'kind', 'sort', 'variety', 'one')
 
 # Search for non-namespaced Wikipedia sources.
-WIKIPEDIA_SOURCE = re.compile(r'(http://en.wikipedia.org/wiki/([^:]|:_)+)(\||$)')
-
+#don't need this anymore as Reverb1.3 does not include this information
+#WIKIPEDIA_SOURCE = re.compile(r'(http://en.wikipedia.org/wiki/([^:]|:_)+)(\||$)')
+#instead, we persist this info in the filenames of the articles we extract from Wikipedia
+ARTICLE_NAME = re.compile(r'wiki_(.+).txt')
 def normalize_rel(text):
     parts = normalize(text).split()
     if len(parts) >= 2 and parts[1] == 'be' and parts[0] in ('be', 'have'):
@@ -81,34 +83,30 @@ def remove_tags(tokens, tags, target):
                 tags[index_rb] = 'NEG'
     return tokens, tags
 
-def get_domain_names(urls):
-    parsed_urls = map(lambda x: urlparse(x), urls)
-    domain_names = map(lambda x: x.netloc, parsed_urls)
-    return domain_names
+#def get_domain_names(urls):
+#    parsed_urls = map(lambda x: urlparse(x), urls)
+#    domain_names = map(lambda x: x.netloc, parsed_urls)
+#    return domain_names
 
-def output_triple(arg1, arg2, relation, raw, sources):
+def output_triple(arg1, arg2, relation, raw, sources=[]):
     arg1 = normalize(arg1).strip()
     arg2 = normalize(arg2).strip()
     relation = normalize_rel(relation).strip()
-    found_relation = False
+    found_relation = True
     if relation == 'be for':
-        found_relation = True
         relation = 'UsedFor'
-    if relation == 'be used for':
-        found_relation = True
+    elif relation == 'be used for':
         relation = 'UsedFor'
-    if relation == 'be not':
-        found_relation = True
+    elif relation == 'be not':
         relation = 'IsNot'
-    if relation == 'be part of':
-        found_relation = True
+    elif relation == 'be part of':
         relation = 'PartOf'
-    if relation == 'be similar to':
-        found_relation = True
+    elif relation == 'be similar to':
         relation = 'SimilarTo'
-    if relation.startswith('be ') and relation.endswith(' of') and relation[3:-3] in TYPE_WORDS:
-        found_relation = True
+    elif relation.startswith('be ') and relation.endswith(' of') and relation[3:-3] in TYPE_WORDS:
         relation = 'IsA'
+    else:
+        found_relation = False
     if found_relation:
         rel_node = GRAPH.get_or_create_relation(relation)
     else:
@@ -129,19 +127,20 @@ def output_triple(arg1, arg2, relation, raw, sources):
     GRAPH.justify(conjunction, assertion)
     for source in sources:
         # Put in context with Wikipedia articles.
-        topic = article_url_to_topic(source)
+        topic = source
         context = GRAPH.get_or_create_concept('en', topic)
         context_normal = GRAPH.get_or_create_concept('en', *normalize_topic(topic))
         GRAPH.add_context(assertion, context_normal)
         GRAPH.get_or_create_edge('normalized', context, context_normal)
         print "in", context_normal
+   
     return assertion
 
-def article_url_to_topic(url):
-    before, after = url.split('/wiki/', 1)
-    return urllib.unquote(after).replace('_', ' ')
+#def article_url_to_topic(url):
+#    before, after = url.split('/wiki/', 1)
+#    return urllib.unquote(after).replace('_', ' ')
 
-def output_raw(raw_arg1, raw_arg2, raw_relation, sources):
+def output_raw(raw_arg1, raw_arg2, raw_relation, confidence, sources=[]):
     frame = u"{1} %s {2}" % (raw_relation)
     raw = GRAPH.get_or_create_assertion(
         GRAPH.get_or_create_frame('en', frame),
@@ -156,48 +155,34 @@ def output_raw(raw_arg1, raw_arg2, raw_relation, sources):
     # all mirrors.
     conjunction = GRAPH.get_or_create_conjunction([wikipedia, reverb])
     
-    # The assertions start with numbers are really bad in ReVerb.
-    # We set a small weight on the justification edge, if we include
-    # them at all.
-    if raw_arg1[0].isdigit():
-        GRAPH.justify(conjunction, raw, weight=0.2)
-    else:
-        GRAPH.justify(conjunction, raw, weight=0.7)
-
+    GRAPH.justify(conjunction, raw, weight=confidence)
     for source in sources:
         # Put in context with Wikipedia articles.
-        topic = article_url_to_topic(source)
+        #topic = article_url_to_topic(source)
+        topic = source
         context = GRAPH.get_or_create_concept('en', topic)
         GRAPH.add_context(raw, context)
+
+    #add sentence as context?
     return raw
 
-def output_sentence(arg1, arg2, arg3, relation, raw, sources, prep=None):
+def output_sentence(arg1, arg2, arg3, relation, raw, confidence, sources=[], prep=None):
     # arg3 is vestigial; we weren't getting sensible statements from it.
     if arg2.strip() == "": # Remove "A is for B" sentence
         return
     arg1 = normalize(arg1).strip()
     arg2 = normalize(arg2).strip()
     assertion = None
-    if arg3 == None:
-        print '%s(%s, %s)' % (relation, arg1, arg2)
-        assertion = GRAPH.get_or_create_assertion(
-            '/relation/'+relation,
-            [GRAPH.get_or_create_concept('en', arg1),
-             GRAPH.get_or_create_concept('en', arg2)],
-            {'dataset': 'reverb/en', 'license': 'CC-By-SA',
-             'normalized': True}
+    print '%s(%s, %s)' % (relation, arg1, arg2)
+    assertion = GRAPH.get_or_create_assertion(
+        '/relation/'+relation,
+        [GRAPH.get_or_create_concept('en', arg1),
+        GRAPH.get_or_create_concept('en', arg2)],
+        {'dataset': 'reverb/en', 'license': 'CC-By-SA',
+        'normalized': True}
         )
-        assertions = (assertion,)
-    else:
-        print '%s(%s, %s)' % \
-            (relation, arg1, arg2)
-        assertion1 = GRAPH.get_or_create_assertion(
-            '/relation/'+relation,
-            [GRAPH.get_or_create_concept('en', arg1),
-             GRAPH.get_or_create_concept('en', arg2)],
-            {'dataset': 'reverb/en', 'license': 'CC-By-SA',
-             'normalized': True}
-        )
+    assertions = (assertion,)            
+    #if not arg3 == None:
         #arg3 = normalize(arg3).strip()
         #assertion2 = GRAPH.get_or_create_assertion(
         #    GRAPH.get_or_create_concept('en', prep, 'p'),
@@ -206,16 +191,17 @@ def output_sentence(arg1, arg2, arg3, relation, raw, sources, prep=None):
         #    {'dataset': 'reverb/en', 'license': 'CC-By-SA',
         #     'normalized': True}
         #)
-        assertions = (assertion1,)
+        #assertions = (assertion, assertion2)
     
     for assertion in assertions:
         conjunction = GRAPH.get_or_create_conjunction(
             [raw, reverb_object]
         )
-        GRAPH.justify(conjunction, assertion)
+        GRAPH.justify(conjunction, assertion, weight=confidence)
         for source in sources:
             # Put in context with Wikipedia articles.
-            topic = article_url_to_topic(source)
+            #topic = article_url_to_topic(source)
+            topic = source
             context = GRAPH.get_or_create_concept('en', *normalize_topic(topic))
             GRAPH.add_context(assertion, context)
 
@@ -232,24 +218,29 @@ def handle_line(line):
     parts = line.split('\t')
     if len(parts) < 10:
         return
-    id, old_arg1, old_rel, old_arg2, nor_arg1, nor_rel, nor_arg2, \
-        num_sentence, confidence, url = parts
+    filename, sent_num, old_arg1, old_rel, old_arg2, \
+    arg1_start, arg1_end, rel_start, rel_end, arg2_start, arg2_end, \
+    confidence, sent_fragment, pos_tags, chunk_tags, \
+    nor_arg1, nor_rel, nor_arg2 = parts
     # Rob put this in: skip all the numeric ones for now, our time
     # is better spent on others
     if old_arg1[0].isdigit() or old_arg2[0].isdigit():
         return
-    sources = [match[0] for match in WIKIPEDIA_SOURCE.findall(url)]
-    if not sources:
+    match = ARTICLE_NAME.match(filename.split('/')[-1])
+    if not match:
         return
+    sources = [match.group(1)]
+
     
     sentence = "%s %s %s" % (old_arg1, old_rel, old_arg2)
-    tokens = nltk.word_tokenize(sentence)
-    tags = map(lambda x: x[1], nltk.pos_tag(tokens))
+    tokens  = sent_fragment.split('\s')
+    tags = pos_tags.split('\s')
+    assert(len(tokens) == len(tags))
     tokens, tags = remove_tags(tokens, tags, 'RB')	# Remove adverb
     tokens, tags = remove_tags(tokens, tags, 'MD')	# Remove modals
     tokens = map(lambda x: x.lower(), tokens)
 
-    raw = output_raw(old_arg1, old_arg2, old_rel, sources)
+    raw = output_raw(old_arg1, old_arg2, old_rel, confidence, sources)
     if probably_present_tense(old_rel.split()[0]):
         triple = output_triple(old_arg1, old_arg2, old_rel, raw, sources)
 
@@ -275,37 +266,37 @@ def handle_line(line):
         if next_tag == 'DT': # IsA relation
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+2:])
-                output_sentence(arg1, arg2, None, 'IsA', raw, sources)
+                output_sentence(arg1, arg2, None, 'IsA', raw, confidence, sources)
             else:
                 if tokens[index_prep] == 'of' and \
                     tokens[index_prep-1] in TYPE_WORDS:
                     # 'a kind of' frame
                     arg2 = untokenize(tokens[index_prep+1:])
-                    output_sentence(arg1, arg2, None, 'IsA', raw, sources)
+                    output_sentence(arg1, arg2, None, 'IsA', raw, confidence, sources)
                 elif tokens[index_prep] == 'of' and \
                     tokens[index_prep-1] == 'part':
                     # 'a part of' frame
                     arg2 = untokenize(tokens[index_prep+1:])
-                    output_sentence(arg1, arg2, None, 'PartOf', raw, sources)
+                    output_sentence(arg1, arg2, None, 'PartOf', raw, confidence, sources)
                 else:
                     arg2 = untokenize(tokens[index_be+1:index_prep])
                     arg3 = untokenize(tokens[index_prep+1:])
                     prep = tokens[index_prep]
                     #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                     #print prep_frame
-                    output_sentence(arg1, arg2, arg3, 'IsA', raw, sources,
+                    output_sentence(arg1, arg2, arg3, 'IsA', raw, confidence, sources,
                         prep=prep)
         else:
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+1:])
-                output_sentence(arg1, arg2, None, 'HasProperty', raw, sources)
+                output_sentence(arg1, arg2, None, 'HasProperty', raw, confidence, sources)
             else:
                 arg2 = untokenize(tokens[index_be+1:index_prep])
                 arg3 = untokenize(tokens[index_prep+1:])
                 prep = tokens[index_prep]
                 #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, 'HasProperty', raw, sources,
+                output_sentence(arg1, arg2, arg3, 'HasProperty', raw, confidence, sources,
                     prep=prep)
     else:
         index_be = index_of_be(tokens)
@@ -323,14 +314,14 @@ def handle_line(line):
                 relation = 'DirectObjectOf'
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+1:])
-                output_sentence(arg1, arg2, None, relation, raw, sources)
+                output_sentence(arg1, arg2, None, relation, raw, confidence, sources)
             else:
                 arg2 = untokenize(tokens[index_be+1:index_prep])
                 arg3 = untokenize(tokens[index_prep+1:])
                 prep = tokens[index_prep]
                 #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, relation, raw, sources,
+                output_sentence(arg1, arg2, arg3, relation, raw, confidence, sources,
                     prep=prep)
         else: # SubjectOf relation
             if index_prep > 0:
@@ -340,7 +331,7 @@ def handle_line(line):
                 prep = tokens[index_prep]
                 #prep_frame = 'Something '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, 'SubjectOf', raw, sources,
+                output_sentence(arg1, arg2, arg3, 'SubjectOf', raw, confidence, sources, 
                     prep=prep)
 
 if __name__ == '__main__':
