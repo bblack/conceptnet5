@@ -9,7 +9,7 @@ import codecs
 import nltk
 import os
 import re
-
+import json
 GRAPH = JSONWriterGraph('json_data/reverb')
 
 reverb = GRAPH.get_or_create_node(u'/source/rule/reverb')
@@ -23,12 +23,48 @@ GRAPH.justify('/', reverb_triple, 0.5)
 GRAPH.justify('/', wikipedia)
 
 TYPE_WORDS = ('type', 'kind', 'sort', 'variety', 'one')
+PRONOUN_TAGS = ('PRP', 'PRP$', 'WP', 'WP$')
+WEIGHT_THRESH = 0.6
 
 # Search for non-namespaced Wikipedia sources.
 #don't need this anymore as Reverb1.3 does not include this information
 #WIKIPEDIA_SOURCE = re.compile(r'(http://en.wikipedia.org/wiki/([^:]|:_)+)(\||$)')
 #instead, we persist this info in the filenames of the articles we extract from Wikipedia
 ARTICLE_NAME = re.compile(r'wiki_(.+).txt')
+
+def bracket_concepts(text, start1, end1, start2, end2):
+    words = re.split('\s', text.strip())
+    words.insert(start1, "[[")
+    words.insert(end1 + 1, "]]")
+    words.insert(start2 + 2, "[[")
+    words.insert(end2 + 3, "]]")
+    return ' '.join(words)
+        
+def output_reverb_data(arg1, start1, end1, 
+                       arg2, start2, end2, 
+                       relation, weight, 
+                       sources, surfaceText, 
+                       rules):
+    """
+    Output the relevant reverb data in json. This includes the
+    text of the two related terms, the original text in the sentence, the
+    source page, and the weight, and a list of programmatic rules that 
+    were applied to produce this statement". Rule names URIs that look like
+    /source/rule/reverb/make_up_a_name_here.
+    """
+    result = {"rel": relation,
+            "arg1": arg1,
+            "arg2": arg2,
+            "weight" : weight,
+            "sources" : sources,
+            "surfaceText" :  bracket_concepts(surfaceText,
+                                              start1, end1,
+                                              start2, end2),
+            "rules": rules}
+    print json.dumps(result)
+    print '\n'
+    return result
+
 def normalize_rel(text):
     parts = normalize(text).split()
     if len(parts) >= 2 and parts[1] == 'be' and parts[0] in ('be', 'have'):
@@ -88,7 +124,9 @@ def remove_tags(tokens, tags, target):
 #    domain_names = map(lambda x: x.netloc, parsed_urls)
 #    return domain_names
 
-def output_triple(arg1, arg2, relation, raw, sources=[]):
+def output_triple(arg1, start1, end1, arg2, start2, end2, 
+                  relation, confidence, raw, surfaceText, sources=[]):
+
     arg1 = normalize(arg1).strip()
     arg2 = normalize(arg2).strip()
     relation = normalize_rel(relation).strip()
@@ -111,8 +149,8 @@ def output_triple(arg1, arg2, relation, raw, sources=[]):
         rel_node = GRAPH.get_or_create_relation(relation)
     else:
         rel_node = GRAPH.get_or_create_concept('en', relation)
-    print '%s(%s, %s)' % \
-        (relation, arg1, arg2),
+   # print '%s(%s, %s)' % \
+   #     (relation, arg1, arg2),
 
     assertion = GRAPH.get_or_create_assertion(
         rel_node,
@@ -121,7 +159,7 @@ def output_triple(arg1, arg2, relation, raw, sources=[]):
         {'dataset': 'reverb/en', 'license': 'CC-By-SA',
          'normalized': True}
     )
-    GRAPH.derive_normalized(raw, assertion)
+    GRAPH.derive_normalized(raw, assertion, weight=confidence)
     
     conjunction = GRAPH.get_or_create_conjunction([raw, reverb_triple])
     GRAPH.justify(conjunction, assertion)
@@ -132,15 +170,18 @@ def output_triple(arg1, arg2, relation, raw, sources=[]):
         context_normal = GRAPH.get_or_create_concept('en', *normalize_topic(topic))
         GRAPH.add_context(assertion, context_normal)
         GRAPH.get_or_create_edge('normalized', context, context_normal)
-        print "in", context_normal
+        # print "in", context_normal
    
+    rules = [reverb_triple]
+    output_reverb_data(arg1, start1, end1, arg2, start2, end2, relation, confidence, sources, surfaceText, rules) 
     return assertion
 
 #def article_url_to_topic(url):
 #    before, after = url.split('/wiki/', 1)
 #    return urllib.unquote(after).replace('_', ' ')
 
-def output_raw(raw_arg1, raw_arg2, raw_relation, confidence, sources=[]):
+def output_raw(raw_arg1, start1, end1, raw_arg2, start2, end2, 
+               raw_relation, confidence, surfaceText, sources=[]):
     frame = u"{1} %s {2}" % (raw_relation)
     raw = GRAPH.get_or_create_assertion(
         GRAPH.get_or_create_frame('en', frame),
@@ -164,16 +205,19 @@ def output_raw(raw_arg1, raw_arg2, raw_relation, confidence, sources=[]):
         GRAPH.add_context(raw, context)
 
     #add sentence as context?
+    rules = [reverb]
+    output_reverb_data(raw_arg1, start1, end1, raw_arg2, start2, end2, raw_relation, confidence, sources, surfaceText, rules) 
     return raw
 
-def output_sentence(arg1, arg2, arg3, relation, raw, confidence, sources=[], prep=None):
+def output_sentence(arg1, start1, end1, arg2, start2, end2, arg3, 
+                    relation, raw, confidence, surfaceText, sources=[], prep=None):
     # arg3 is vestigial; we weren't getting sensible statements from it.
     if arg2.strip() == "": # Remove "A is for B" sentence
         return
     arg1 = normalize(arg1).strip()
     arg2 = normalize(arg2).strip()
     assertion = None
-    print '%s(%s, %s)' % (relation, arg1, arg2)
+    #print '%s(%s, %s)' % (relation, arg1, arg2)
     assertion = GRAPH.get_or_create_assertion(
         '/relation/'+relation,
         [GRAPH.get_or_create_concept('en', arg1),
@@ -205,6 +249,8 @@ def output_sentence(arg1, arg2, arg3, relation, raw, confidence, sources=[], pre
             context = GRAPH.get_or_create_concept('en', *normalize_topic(topic))
             GRAPH.add_context(assertion, context)
 
+    rules = [reverb_object]
+    output_reverb_data(arg1, start1, end1, arg2, start2, end2, relation, confidence, sources, surfaceText, rules) 
     return assertion
 
 def handle_file(filename):
@@ -216,33 +262,57 @@ def handle_file(filename):
 
 def handle_line(line):
     parts = line.split('\t')
-    if len(parts) < 10:
+    if len(parts) < 18:
         return
     filename, sent_num, old_arg1, old_rel, old_arg2, \
     arg1_start, arg1_end, rel_start, rel_end, arg2_start, arg2_end, \
-    confidence, sent_fragment, pos_tags, chunk_tags, \
+    confidence, surfaceText, pos_tags, chunk_tags, \
     nor_arg1, nor_rel, nor_arg2 = parts
     # Rob put this in: skip all the numeric ones for now, our time
     # is better spent on others
     if old_arg1[0].isdigit() or old_arg2[0].isdigit():
         return
+    #weight is too low
+    if float(confidence) < WEIGHT_THRESH:
+        return
+
     match = ARTICLE_NAME.match(filename.split('/')[-1])
     if not match:
         return
     sources = [match.group(1)]
 
-    
+    arg1_start = int(arg1_start)
+    arg1_end = int(arg1_end)
+    arg2_start = int(arg2_start)
+    arg2_end = int(arg2_end)
+
     sentence = "%s %s %s" % (old_arg1, old_rel, old_arg2)
-    tokens  = sent_fragment.split('\s')
+    tokens  = surfaceText.split('\s')
     tags = pos_tags.split('\s')
     assert(len(tokens) == len(tags))
+
+    #one of the arguments is a preposition
+    pos_tags_list = re.split('\s', pos_tags)
+    for pronoun in PRONOUN_TAGS:
+        idx = index_of_tag(pos_tags_list, pronoun)
+        if old_arg1 == "she": print pos_tags_list
+        if  (arg1_start <= idx <= arg1_end) or (arg2_start <= idx <= arg2_end):
+            return
+
     tokens, tags = remove_tags(tokens, tags, 'RB')	# Remove adverb
     tokens, tags = remove_tags(tokens, tags, 'MD')	# Remove modals
     tokens = map(lambda x: x.lower(), tokens)
 
-    raw = output_raw(old_arg1, old_arg2, old_rel, confidence, sources)
+    raw = output_raw(old_arg1, arg1_start, arg1_end, 
+                     old_arg2, arg2_start, arg2_end, 
+                     old_rel, confidence, surfaceText, sources)
+
+
     if probably_present_tense(old_rel.split()[0]):
-        triple = output_triple(old_arg1, old_arg2, old_rel, raw, sources)
+        triple = output_triple(old_arg1, arg1_start, arg1_end,
+                               old_arg2, arg2_start, arg2_end,
+                               old_rel, confidence, raw, surfaceText, sources)
+                           
 
     index_verbs = index_of_verbs(tags)
     if len(index_verbs) == 0: return
@@ -266,38 +336,50 @@ def handle_line(line):
         if next_tag == 'DT': # IsA relation
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+2:])
-                output_sentence(arg1, arg2, None, 'IsA', raw, confidence, sources)
+                output_sentence(arg1, arg1_start, arg1_end,
+                                arg2, arg2_start, arg2_end, None, 
+                                'IsA', raw, confidence, surfaceText, sources)
             else:
                 if tokens[index_prep] == 'of' and \
                     tokens[index_prep-1] in TYPE_WORDS:
                     # 'a kind of' frame
                     arg2 = untokenize(tokens[index_prep+1:])
-                    output_sentence(arg1, arg2, None, 'IsA', raw, confidence, sources)
+                    output_sentence(arg1, arg1_start, arg1_end, 
+                                    arg2, arg2_start, arg2_end, None, 
+                                    'IsA', raw, confidence, surfaceText, sources)
                 elif tokens[index_prep] == 'of' and \
                     tokens[index_prep-1] == 'part':
                     # 'a part of' frame
                     arg2 = untokenize(tokens[index_prep+1:])
-                    output_sentence(arg1, arg2, None, 'PartOf', raw, confidence, sources)
+                    output_sentence(arg1, arg1_start, arg1_end,
+                                    arg2, arg2_start, arg2_end, None, 
+                                    'PartOf', raw, confidence, surfaceText, sources)
                 else:
                     arg2 = untokenize(tokens[index_be+1:index_prep])
                     arg3 = untokenize(tokens[index_prep+1:])
                     prep = tokens[index_prep]
                     #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                     #print prep_frame
-                    output_sentence(arg1, arg2, arg3, 'IsA', raw, confidence, sources,
-                        prep=prep)
+                    output_sentence(arg1, arg1_start, arg1_end, 
+                                    arg2, arg2_start, arg2_end, arg3, 
+                                    'IsA', raw, confidence, surfaceText, sources,
+                                    prep=prep)
         else:
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+1:])
-                output_sentence(arg1, arg2, None, 'HasProperty', raw, confidence, sources)
+                output_sentence(arg1, arg1_start, arg1_end, 
+                                arg2, arg2_start, arg2_end, None, 
+                                'HasProperty', raw, confidence, surfaceText, sources)
             else:
                 arg2 = untokenize(tokens[index_be+1:index_prep])
                 arg3 = untokenize(tokens[index_prep+1:])
                 prep = tokens[index_prep]
                 #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, 'HasProperty', raw, confidence, sources,
-                    prep=prep)
+                output_sentence(arg1, arg1_start, arg1_end, 
+                                arg2, arg2_start, arg2_end, arg3, 
+                                'HasProperty', raw, confidence, surfaceText, sources,
+                                prep=prep)
     else:
         index_be = index_of_be(tokens)
         if index_be == len(tokens) - 1: return
@@ -314,15 +396,19 @@ def handle_line(line):
                 relation = 'DirectObjectOf'
             if index_prep == 0:
                 arg2 = untokenize(tokens[index_be+1:])
-                output_sentence(arg1, arg2, None, relation, raw, confidence, sources)
+                output_sentence(arg1, arg1_start, arg1_end, 
+                                arg2, arg2_start, arg2_end, None, 
+                                relation, raw, confidence, surfaceText, sources)
             else:
                 arg2 = untokenize(tokens[index_be+1:index_prep])
                 arg3 = untokenize(tokens[index_prep+1:])
                 prep = tokens[index_prep]
                 #prep_frame = 'Something can be '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, relation, raw, confidence, sources,
-                    prep=prep)
+                output_sentence(arg1, arg1_start, arg1_end,
+                                arg2, arg2_start, arg2_end, arg3, 
+                                relation, raw, confidence, surfaceText, sources,
+                                prep=prep)
         else: # SubjectOf relation
             if index_prep > 0:
                 arg1 = untokenize(tokens[:index_verbs[0]])
@@ -331,11 +417,18 @@ def handle_line(line):
                 prep = tokens[index_prep]
                 #prep_frame = 'Something '+untokenize([arg2, prep, arg3])
                 #print prep_frame
-                output_sentence(arg1, arg2, arg3, 'SubjectOf', raw, confidence, sources, 
-                    prep=prep)
+                output_sentence(arg1, arg1_start, arg1_end,
+                                arg2, arg2_start, arg2_end, arg3, 
+                                'SubjectOf', raw, confidence, sources, 
+                                prep=prep)
 
 if __name__ == '__main__':
-    import sys
+    import sys, locale
+    if sys.stdout.encoding is None:
+       (lang, enc) = locale.getdefaultlocale()
+       if enc is not None:
+           (e, d, sr, sw) = codecs.lookup(enc)
+	   # sw will encode Unicode data to the locale-specific character set.
+	   sys.stdout = sw(sys.stdout)
     for filename in sys.argv[1:]:
-        if filename.startswith('reverb'):
-            handle_file(filename)
+        handle_file(filename)
