@@ -303,11 +303,12 @@ def handle_line(line):
     tokens, tags = remove_tags(tokens, tags, 'MD')	# Remove modals
     tokens = map(lambda x: x.lower(), tokens)
 
+	#output an assertion from the raw arguments and relations
     raw = output_raw(old_arg1, arg1_start, arg1_end, 
                      old_arg2, arg2_start, arg2_end, 
                      old_rel, confidence, surfaceText, sources)
 
-
+	#
     if probably_present_tense(old_rel.split()[0]):
         triple = output_triple(old_arg1, arg1_start, arg1_end,
                                old_arg2, arg2_start, arg2_end,
