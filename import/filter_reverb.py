@@ -40,9 +40,12 @@ GRAPH.justify('/', wikipedia)
 PRONOUN_TAGS = ('PRP', 'PRP$', 'WP', 'WP$')
 PROPER_NOUN_TAGS = ('NNP, NNPS')
 WEIGHT_THRESH = 0.6
+REL_LEN_THRESH = 5
 NEGATIVES = ['not', "n't", 'never', 'rarely']
 BE = ['is', 'are', 'was', 'were', 'be']
 TYPE_WORDS = ('type', 'kind', 'sort', 'variety', 'one')
+DEMONSTRATIVES = ('this', 'that', 'these', 'those')
+
 # Wikipedia sources.
 # we persist this info in the filenames of the articles we extract from Wikipedia
 ARTICLE_NAME = re.compile(r'wiki_(.+).txt')
@@ -56,26 +59,26 @@ ARTICLE_NAME = re.compile(r'wiki_(.+).txt')
 ###################################################################	
 class ReverbLine:
 
-	"""Represents a parsed line from a reverb output file
+    """Represents a parsed line from a reverb output file
 	"""
 
-	def __init__(self, data):
+    def __init__(self, data):
 		self.filename, self.sent_num, self.arg1, self.rel, self.arg2, \
    	 	self.arg1_start, self.arg1_end, self.rel_start, self.rel_end, self.arg2_start, self.arg2_end, \
     		self.confidence, self.surfaceText, self.pos_tags, self.chunk_tags, \
     		self.nor_arg1, self.nor_rel, self.nor_arg2, self.tokens, self.tags, self.sources = data
 
 	
-	@staticmethod
-	def index_of_be(tokens):
+    @staticmethod
+    def index_of_be(tokens):
 		# returns the index of the first 'be' (or one of its forms) in the sentence
 		for token in tokens:
 		    if token in BE:
 		        return tokens.index(token)
 		return -1
 
-	@staticmethod
-	def index_of_verbs(tags):
+    @staticmethod
+    def index_of_verbs(tags):
 		# returns a list of indices of the verbs in the sentence
 		index = []
 		for tag in tags:
@@ -83,56 +86,56 @@ class ReverbLine:
 		        index.append(tags.index(tag))
 		return index
 
-	@staticmethod
-	def contain_single_be(tokens, tags):
+    @staticmethod
+    def contain_single_be(tokens, tags):
 		# returns the part of speech tag of the 'be' or 'been' in the sentence
 		# if the sentence only has a single 'be' or 'been'
-		verbs = filter(lambda x: x.startswith('V'), tags)
-		if len(verbs) == 1 and tokens[tags.index(verbs[0])] in BE:
-		    return tags.index(verbs[0])
-		elif len(verbs) == 2 and tokens[tags.index(verbs[1])] == 'been':
-		    return tags.index(verbs[1])
-		return -1
+        verbs = filter(lambda x: x.startswith('V'), tags)
+        if len(verbs) == 1 and tokens[tags.index(verbs[0])] in BE:
+            return tags.index(verbs[0])
+        elif len(verbs) == 2 and tokens[tags.index(verbs[1])] == 'been':
+            return tags.index(verbs[1])
+        return -1
 
-	@staticmethod
-	def parse_line(line):
-		"""Parses a line from a reverb output file or returns None if it is malformed
-		"""
+    @staticmethod
+    def parse_line(line):
+        """Parses a line from a reverb output file or returns None if it is malformed"""
 
-		parts = line.split('\t')
-		if len(parts) < 18:
+        parts = line.split('\t')
+        if len(parts) < 18:
 		    return None
 
-		filename, sent_num, arg1, rel, arg2, \
+        filename, sent_num, arg1, rel, arg2, \
 		arg1_start, arg1_end, rel_start, rel_end, arg2_start, arg2_end, \
 		confidence, surfaceText, pos_tags, chunk_tags, \
 		nor_arg1, nor_rel, nor_arg2 = parts
 
 
-		match = ARTICLE_NAME.match(filename.split('/')[-1])
-		if not match:
-		    	return None
+        match = ARTICLE_NAME.match(filename.split('/')[-1])
+        if not match:
+            	return None
 
-		sources = [match.group(1)]
+        sources = [match.group(1)]
 
-		arg1_start = int(arg1_start)
-		arg1_end = int(arg1_end)
-		arg2_start = int(arg2_start)
-		arg2_end = int(arg2_end)
-		confidence = float(confidence)
-
-		tokens  = re.split('\s', surfaceText)
-		tags = re.split('\s', pos_tags)
-		assert(len(tokens) == len(tags))	
-
-		data = filename, sent_num, arg1, rel, arg2, \
-		arg1_start, arg1_end, rel_start, rel_end, arg2_start, arg2_end, \
+        arg1_start = int(arg1_start)
+        arg1_end = int(arg1_end)
+        arg2_start = int(arg2_start)
+        arg2_end = int(arg2_end)
+        rel_start = int(rel_start)
+        rel_end = int(rel_end)
+        confidence = float(confidence)
+    
+        tokens  = re.split('\s', surfaceText)
+        tags = re.split('\s', pos_tags)
+        assert(len(tokens) == len(tags))	
+        
+        data = filename, sent_num, arg1, rel, arg2, \
+        arg1_start, arg1_end, rel_start, rel_end, arg2_start, arg2_end, \
 		confidence, surfaceText, pos_tags, chunk_tags, \
 		nor_arg1, nor_rel, nor_arg2, tokens, tags, sources
-
-		result = ReverbLine(data)
-
-		return result
+        
+        result = ReverbLine(data)
+        return result
     
 class ReverbFilter:
     """contains functions that are used to constrain/filter Reverb output  
@@ -190,6 +193,19 @@ class ReverbFilter:
     def is_after_comma(reverb_line):
         return not ReverbFilter.at_sentence_start(reverb_line) and \
                 reverb_line.tokens[reverb_line.arg1_start - 1] == ','
+
+    @staticmethod
+    def has_long_relation(reverb_line):
+        return reverb_line.rel_start - reverb_line.rel_end > REL_LEN_THRESH
+
+    @staticmethod
+    def has_demonstrative(reverb_line):
+        for d in DEMONSTRATIVES:
+            if d in reverb_line.arg1.lower() or \
+                d in reverb_line.arg2.lower() or \
+                d in reverb_line.rel.lower(): return True
+
+        return False
 
 ###################################################################
 #
@@ -290,7 +306,8 @@ def output_raw(reverb_line):
         GRAPH.add_context(raw, context)
 
     rules = [reverb]
-    output_reverb_data(reverb_line, rules) 
+    print '%s(%s, %s)' % (reverb_line.rel, reverb_line.arg1, reverb_line.arg2)
+    #output_reverb_data(reverb_line, rules) 
     return raw
 
 
@@ -317,7 +334,7 @@ def output_triple(reverb_line, raw):
         rel_node = GRAPH.get_or_create_relation(relation)
     else:
         rel_node = GRAPH.get_or_create_concept('en', relation)
-   	print '%s(%s, %s)' % (relation, arg1, arg2),
+   	print '%s(%s, %s)' % (relation, arg1, arg2)
 
     assertion = GRAPH.get_or_create_assertion(
         rel_node,
@@ -345,7 +362,7 @@ def output_triple(reverb_line, raw):
 	reverb_line.arg1 = arg1
 	reverb_line.arg2 = arg2	
 	reverb_line.rel = relation
-    output_reverb_data(reverb_line, rules) 
+    #output_reverb_data(reverb_line, rules) 
 
     return assertion
 
@@ -378,7 +395,7 @@ def output_sentence(relation, arg1, arg2, raw, reverb_line):
 	reverb_line.arg1 = arg1
 	reverb_line.arg2 = arg2	
 	reverb_line.rel = relation
-	output_reverb_data(reverb_line, rules) 
+	#output_reverb_data(reverb_line, rules) 
 	
 	return assertion
 
@@ -475,7 +492,8 @@ def handle_line(line):
     if ReverbFilter.is_low_confidence(rline) or ReverbFilter.is_numeric(rline) or \
         ReverbFilter.has_pronoun_arg(rline) or ReverbFilter.not_triple(rline) or \
         not ReverbFilter.contains_article_name(rline) or \
-        not (ReverbFilter.at_sentence_start(rline) or ReverbFilter.is_after_comma(rline)):
+        not (ReverbFilter.at_sentence_start(rline) or ReverbFilter.is_after_comma(rline)) or \
+        ReverbFilter.has_long_relation(rline) or ReverbFilter.has_demonstrative(rline):
 		return
 
 	#process all the statements that have passed our filters
