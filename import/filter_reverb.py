@@ -141,10 +141,12 @@ class ReverbFilter:
     def is_low_confidence(reverb_line):
 		# this extraction is assigned a low confidence by the Reverb extractor
 		return reverb_line.confidence < WEIGHT_THRESH
+
     @staticmethod
     def is_numeric(reverb_line):
 		# one of the arguments is a number
 		return reverb_line.arg1[0].isdigit() or reverb_line.arg2[0].isdigit()
+
     @staticmethod
     def has_pronoun_arg(reverb_line):
 		#one of the arguments contains a pronoun
@@ -178,7 +180,16 @@ class ReverbFilter:
             elif reverb_line.arg2_start <= idx <= reverb_line.arg2_end: 
                 in_arg2 = True
 	
-        return in_arg1 or in_arg2	
+        return in_arg1 or in_arg2
+
+    @staticmethod
+    def at_sentence_start(reverb_line):
+        return reverb_line.arg1_start == 0
+
+    @staticmethod
+    def is_after_comma(reverb_line):
+        return not ReverbFilter.at_sentence_start(reverb_line) and \
+                reverb_line.tokens[reverb_line.arg1_start - 1] == ','
 
 ###################################################################
 #
@@ -463,7 +474,8 @@ def handle_line(line):
 	# do all filtering of statements here
     if ReverbFilter.is_low_confidence(rline) or ReverbFilter.is_numeric(rline) or \
         ReverbFilter.has_pronoun_arg(rline) or ReverbFilter.not_triple(rline) or \
-        not ReverbFilter.contains_article_name(rline):
+        not ReverbFilter.contains_article_name(rline) or \
+        not (ReverbFilter.at_sentence_start(rline) or ReverbFilter.is_after_comma(rline)):
 		return
 
 	#process all the statements that have passed our filters
